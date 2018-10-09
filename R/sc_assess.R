@@ -506,7 +506,7 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   #cohen's kappa, accuracy
   pred_label <- c()
   pred_label <- colnames(ct_scores_t)[max.col(ct_scores_t,ties.method="random")]
-  
+  pred_label <- pred_label[!is.na(pred_label)] 
   cm = as.matrix(table(Actual = true_label, Predicted = pred_label))
   
   #in case of misclassfication where there are classifiers that are not used
