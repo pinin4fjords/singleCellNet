@@ -422,7 +422,7 @@ makeSampleTable <- function(ct_scores, stQuery, nRand, dLevelSID){
   tmp[,dLevelSID] <- sampIDs[(length(sampIDs) - nRand + 1):length(sampIDs)]
   rownames(tmp) <- tmp[, dLevelSID]
   stVal_tmp <- rbind(stQuery, tmp)
-  rownames(stVal_tmp) <- stVal_tmp[,dLevelSID]
+  #rownames(stVal_tmp) <- stVal_tmp[,dLevelSID]
   return(stVal_tmp)
 }
 
@@ -506,7 +506,7 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   #cohen's kappa, accuracy
   pred_label <- c()
   pred_label <- colnames(ct_scores_t)[max.col(ct_scores_t,ties.method="random")]
-  pred_label <- pred_label[!is.na(pred_label)] 
+  
   cm = as.matrix(table(Actual = true_label, Predicted = pred_label))
   
   #in case of misclassfication where there are classifiers that are not used
