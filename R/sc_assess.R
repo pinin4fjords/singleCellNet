@@ -422,7 +422,6 @@ makeSampleTable <- function(ct_scores, stQuery, nRand, dLevelSID){
   tmp[,dLevelSID] <- sampIDs[(length(sampIDs) - nRand + 1):length(sampIDs)]
   rownames(tmp) <- tmp[, dLevelSID]
   stVal_tmp <- rbind(stQuery, tmp)
-  #rownames(stVal_tmp) <- stVal_tmp[,dLevelSID]
   return(stVal_tmp)
 }
 
@@ -492,17 +491,6 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   
   true_label <- as.character(stVal_com[, classLevels])
   
-  #multiLogLoss
-  names(true_label) <- rownames(ct_scores_t) 
-  
-  if (is.matrix(true_label) == FALSE) {
-    y_true <- model.matrix(~ 0 + ., data.frame(as.character(true_label)))
-  }
-  eps <- 1e-15
-  y_pred <- pmax(pmin(ct_scores_t, 1 - eps), eps)
-  
-  report[['multiLogLoss']] <- (-1 / nrow(ct_scores_t)) * sum(t(y_true)%*% log(y_pred)) #want columns to be the cell types for y_pred
-  
   #cohen's kappa, accuracy
   pred_label <- c()
   pred_label <- colnames(ct_scores_t)[max.col(ct_scores_t,ties.method="random")]
@@ -541,7 +529,6 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   expAccuracy = sum(p*q)
   accuracy = sum(diag) / n 
   report[['kappa']] <- (accuracy - expAccuracy) / (1 - expAccuracy)
-  report[['accuracy']] <- accuracy
   
   #report[['multiLogLoss']]<- MultiLogLoss(y_true = true_comm, y_pred = ct_scores_t)
   
@@ -571,7 +558,6 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   
   #report[['AUPRC_w']] <- weighted.mean(areas, w)
   report[['AUPRC_w']] <- mean(areas)
-  report[['AUPRC_wc']] <- weighted.mean(areas, w)
   
   return(report)
   
@@ -692,31 +678,28 @@ plot_class_ROCs<-function
   theme(axis.text = element_text(size=5)) + ggtitle("Classification performance")
 }
 
-plot_multiAssess <- function(assessed, method = "tsp_rf", ylimForMultiLogLoss = x){
+plot_multiAssess <- function(assessed, method = "tsp_rf"){
 
- metric <- matrix(0, ncol = 5, nrow = 1)
-  colnames(metric) <- c("cohen's kappa", "accuracy", "multiLogLoss", "mean_AUPRC","weighted-AUPRC")
+ metric <- matrix(0, ncol = 2, nrow = 1)
+  colnames(metric) <- c("cohen's kappa", "mean_AUPRC")
   rownames(metric) <- "value"
-  metric[,1:5] <- c(assessed$kappa, assessed$accuracy, assessed$multiLogLoss, assessed$AUPRC_w, assessed$AUPRC_wc) 
+  metric[,1:2] <- c(assessed$kappa, assessed$AUPRC_w) 
   metric <- as.data.frame(metric)
+  title = paste0(method, " classification performance PR curve")
 
-  p1<-ggplot(metric, aes(x="cohen's kappa", y = metric[1,1])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) +  ylim(0,1) + theme(legend.position="none")
+  p1<-ggplot(metric, aes(x="cohen's kappa", y = metric[1,1])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme_bw() + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) +  ylim(0,1) + theme(legend.position="none")
 
-  p2<-ggplot(metric, aes(x="accuracy", y = metric[1,2])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) + ylim(0,1) + theme(legend.position="none")
+  p2<-ggplot(metric, aes(x="mean_AUPRC", y = metric[1,2])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme_bw() + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) + ylim(0,1) + theme(legend.position="none")
 
-  p3<-ggplot(metric, aes(x="multiLogLoss", y = metric[1,3])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) + ylim(0,ylimForMultiLogLoss)+ theme(legend.position="none")
-
-  p4<-ggplot(metric, aes(x="mean_AUPRC", y = metric[1,4])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) + ylim(0,1) + theme(legend.position="none")
-
-  p5<-ggplot(metric, aes(x="weight_AUPRC", y = metric[1,5])) + geom_bar(stat="identity") +xlab("") + ylab("") + theme(axis.text=element_text(size=8), axis.title=element_text(size=8)) + ylim(0,1) + theme(legend.position="none")
-
-
-  p6 <- ggplot(data=assessed$nonNA_PR, aes(x=as.numeric(as.vector(recall)), y=as.numeric(as.vector(precision)))) + geom_point(size = .5, alpha=.5) +  geom_path(size=.5, alpha=.75) +
+  p3 <- ggplot(data=assessed$nonNA_PR, aes(x=as.numeric(as.vector(recall)), y=as.numeric(as.vector(precision)))) + geom_point(size = .5, alpha=.5) +  geom_path(size=.5, alpha=.75) +
     theme_bw() + xlab("Recall") + ylab("Precision") + facet_wrap( ~ ctype, ncol=4) +
-    theme(axis.text = element_text(size=5)) + ggtitle("Classification performance_PR Curve")
+    theme(axis.text = element_text(size=5)) + ggtitle(title)
 
-  (p1 | p2 | p4 | p5 | p3) /
-      p6
+  p3 + {
+    p2 +
+      p1 +
+      plot_layout(ncol = 1)
+  } + plot_layout(ncol = 2, widths = c(5, 1))
   
 }
 
