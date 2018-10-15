@@ -530,8 +530,6 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   accuracy = sum(diag) / n 
   report[['kappa']] <- (accuracy - expAccuracy) / (1 - expAccuracy)
   
-  #report[['multiLogLoss']]<- MultiLogLoss(y_true = true_comm, y_pred = ct_scores_t)
-  
   #PR
   confusionMatrix <- cn_classAssess(ct_score_com, stVal_com, classLevels= classLevels, dLevelSID=dLevelSID, resolution=resolution)
   report[['confusionMatrix']] <- confusionMatrix
@@ -544,7 +542,6 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
   nonNA_PR[which((nonNA_PR$TP == 0 & nonNA_PR$FP ==0)), "precision"] <- 1
   report[['nonNA_PR']] <- nonNA_PR
   
-  #totalN <- nrow(nonNA_PR)
   w <- c()
   areas <- c()
   for(i in 1: length(unique(nonNA_PR$ctype))){
@@ -556,7 +553,6 @@ assessmentReport_comm <- function(ct_score_com, #matrix of classification scores
     w <- c(w, sum(stVal_com[,classLevels] %in% unique(nonNA_PR$ctype)[i])/nrow(stVal_com))
   }
   
-  #report[['AUPRC_w']] <- weighted.mean(areas, w)
   report[['AUPRC_w']] <- mean(areas)
   
   return(report)
