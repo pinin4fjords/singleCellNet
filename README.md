@@ -1,132 +1,142 @@
 ---
-title: "README"
+title: "testSingleCellNet"
 author: "Yuqi Tan"
-date: "7/12/2018"
+date: "10/10/2018"
 output: html_document
 ---
-
-## Assessment and BenchMark Implementation
-
-### Loading the packages
-```{r,message=FALSE, warning=FALSE}
-library(cluster)
-library(pcaMethods)
-library(rpca)
-library(data.tree)
-library(Rtsne)
-library(ggplot2)
-library(pheatmap)
-library(RColorBrewer)
-library(mclust)
-library(randomForest)
+```{r, warning=FALSE}
+library(fgsea)
+library(devtools)
 library(singleCellNet)
-library(reshape2)
-library(patchwork)
-library(MLmetrics)
-library(cellrangerRkit)
-library(dbscan)
-library(tidyr)
-library(CellNet)
+library(RColorBrewer)
+library(pheatmap)
+library(randomForest)
+library(viridis)
+library(ggplot2)
+library(dplyr)
 library(pROC)
 library(viridis)
-library(fgsea)
+library(patchwork)
+library(DescTools)
+library(parallel)
 
 mydate<-utils_myDate()
 ```
 
+```{r data fetching}
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/sampTab_Park_MouseKidney_062118.rda", "sampTab_Park_MouseKidney_062118.rda")
 
-|         **Item**       |    **Status**   |
-|------------------------|-----------------|
-| Multiclass assessment  | code :thumbsup: |
-| Cluster comparison     | code :thumbsup: |
-| CrossSpecies & platform|    :octocat:    |
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/expDat_Park_MouseKidney_062218.rda", "expDat_Park_MouseKidney_062218.rda")
 
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/expTM_Raw_053018.rda", "expTM_Raw_053018.rda")
 
-## Multiclass Assessment Demo 
-### dataset use subset tm
-```{r}
-expDat <- utils_loadObject("~/Dropbox (CahanLab)/Yuqi.Tan.2/singleCellNet/ Gold Standard Datasets/app1_expDat_tm_10x_cgenes_Jun1_10x.rda")
-stDat <- utils_loadObject("~/Dropbox (CahanLab)/Yuqi.Tan.2/singleCellNet/ Gold Standard Datasets/app1_stDat_tm_10x_cgenes_Jun1.rda")
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/sampTab_TM_053018.rda", "sampTab_TM_053018.rda")
 
-#subset data
-stDat_sub <- stDat[which(stDat$tissue %in% c("Kidney")),]
-expDat_sub <- expDat[,which(colnames(expDat) %in% row.names(stDat_sub))]
+## For cross-species analyis:
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/human_mouse_genes_Jul_24_2018.rda", "human_mouse_genes_Jul_24_2018.rda")
+
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/6k_beadpurfied_raw.rda", "6k_beadpurfied_raw.rda")
+
+download.file("https://s3.amazonaws.com/cnobjects/singleCellNet/examples/stDat_beads_mar22.rda", "stDat_beads_mar22.rda")
+
 ```
 
-## test tsp_rf classifiers
 ```{r}
-#normalize data 
-expTMnorm<-trans_prop(weighted_down(expDat_sub, 1.5e3), 1e4)
+expPark<-utils_loadObject("expDat_Park_MouseKidney_062218.rda")
+dim(expPark)
+genesPark<-rownames(expPark)
+rm(expPark)
 
-#no splitCommon
-source("~/Desktop/singleCellNet_rf_tsp_sourceFunction.R")
-stList<-splitCommon(stDat_sub, ncells=40, dLevel="cell_ontology_class") #equal number of cells to train 
+expTMraw<-utils_loadObject("expTM_Raw_053018.rda")
+dim(expTMraw)
+#[1] 23433 24936
+
+stTM<-utils_loadObject("sampTab_TM_053018.rda")
+dim(stTM)
+#[1] 24936    17
+
+stTM<-droplevels(stTM)
+
+commonGenes<-intersect(rownames(expTMraw), genesPark)
+length(commonGenes)
+#[1] 13831
+
+expTMnorm<-trans_prop(weighted_down(expTMraw[commonGenes,], 1.5e3, dThresh=0.25), 1e4)
+
+stList<-splitCommon(stTM, ncells=100, dLevel="newAnn")
 stTrain<-stList[[1]]
 expTrain<-expTMnorm[,rownames(stTrain)]
-```
 
-```{r, warning=FALSE}
-#finding top pairs
-system.time(cgenes2<-findClassyGenes(expTrain, stTrain, "cell_ontology_class", topX=10))
-
+system.time(cgenes2<-findClassyGenes(expTrain, stTrain, "newAnn", topX=10))
+ 
 cgenesA<-cgenes2[['cgenes']]
 grps<-cgenes2[['grps']]
 length(cgenesA)
+#[1] 481
 
+# heatmap these genes
 hm_gpa_sel(expTrain, cgenesA, grps, maxPerGrp=5, toScale=T, cRow=F, cCol=F,font=4)
-```
-![ ](img/heatmap.png)
 
-```{r, warning=FALSE}
-#subset data
-system.time(pairDat<-pair_transform(expTrain[cgenesA,]))
-
-system.time(xpairs<-gnrBP(pairDat, grps))
+system.time(xpairs<-ptGetTop(expTrain[cgenesA,], grps, topX=50, sliceSize=5000))
 length(xpairs)
 
-#train classifiers
-system.time(rf_tspAll<-sc_makeClassifier(pairDat[xpairs,], genes=xpairs, groups=grps, nRand=40, ntrees=1000)) 
+system.time(pdTrain<-query_transform(expTrain[cgenesA, ], xpairs))
+dim(pdTrain)
 
-#apply heldout data
+system.time(rf_tspAll<-sc_makeClassifier(pdTrain[xpairs,], genes=xpairs, groups=grps, nRand=100, ntrees=1000))
+
 stTest<-stList[[2]]
-system.time(expQtransAll<-query_transform(expDat_sub[cgenesA,rownames(stTest)], xpairs))
-system.time(classRes_val_all<-rf_classPredict(rf_tspAll, expQtransAll, numRand=40))
 
-#make new sample table with random cells added to the mix
-sla<-as.vector(stTest$cell_ontology_class)
+system.time(expQtransAll<-query_transform(expTMraw[cgenesA,rownames(stTest)], xpairs))
+
+nrand<-100
+system.time(classRes_val_all<-rf_classPredict(rf_tspAll, expQtransAll, numRand=nrand))
+ 
+sla<-as.vector(stTest$newAnn)
 names(sla)<-rownames(stTest)
-slaRand<-rep("rand", 40)
-names(slaRand)<-paste("rand_", 1:40, sep='')
+slaRand<-rep("rand", nrand)
+names(slaRand)<-paste("rand_", 1:nrand, sep='')
+
 sla<-append(sla, slaRand)
 
 sc_hmClass(classRes_val_all, sla, max=300, isBig=TRUE)
 ```
-![ ](img/classification_heatmap.png)
+
+###assessment
+```{r}
+comm <- SubsetQueryBasedOnTraining(stTest, stTrain = stTrain, dLevelSID = "cell",classTrain = "newAnn", classQuery = "newAnn",ct_scores = classRes_val_all,nRand = 100)
+tm_heldoutassessment <- assessmentReport_comm(comm$ct_score_com, classLevels = "newAnn",comm$stVal_com, dLevelSID = "cell")
+plot_multiAssess(tm_heldoutassessment, method = "tsp_rf") 
+```
+<img src="md_img/tm_assess.png">
 
 ```{r}
-#multiclass assessment 
-source("~/Desktop/gpa_assess/sc_assess_anno.R")
-newSampTab<-makeSampleTable(classRes_val_all, stTest, 40, "sample_name")
-tm_heldoutassessment <- assessmentReport(classRes_val_all, stTest, nRand=40)
-#plot all the assessmentReport
-plot_multiAssess(tm_heldoutassessment)
+stPark<-utils_loadObject("sampTab_Park_MouseKidney_062118.rda")
+expPark<-utils_loadObject("expDat_Park_MouseKidney_062218.rda")
+dim(expPark)
+#[1] 16272 43745
+
+system.time(kidTransAll<-query_transform(expPark[cgenesA,], xpairs))
+nqRand<-100
+system.time(crParkall<-rf_classPredict(rf_tspAll, kidTransAll, numRand=nqRand))
+
+sgrp<-as.vector(stPark$description1)
+names(sgrp)<-rownames(stPark)
+grpRand<-rep("rand", nqRand)
+names(grpRand)<-paste("rand_", 1:nqRand, sep='')
+sgrp<-append(sgrp, grpRand)
+
+sc_hmClass(crParkall, sgrp, max=5000, isBig=TRUE, cCol=F, font=8)
+
+stKid2<-addRandToSampTab(crParkall, stPark, "description1", "sample_name")
+skylineClass(crParkall, "T cell", stKid2, "description1",.25, "sample_name")
 ```
 
-![ ](img/assess_tsp_rf.png)
-
+###assessment
 ```{r}
-#multiclass assessment v2
-source("~/Desktop/gpa_assess/assessed.R")
-comm <- SubsetQueryBasedOnTraining(stQuery_kid, stTrain = stDat_tm, classTrain = "cell_ontology_class", classQuery = "description2",ct_scores = classRes_val_all,nRand = 50)
-tm_heldoutassessment <- assessmentReport_comm(comm$ct_score_com, classLevels = "description2",comm$stVal_com)
-plot_multiAssess(tm_heldoutassessment, method = "tsp_rf", ylimForMultiLogLoss = 500) 
+comm <- SubsetQueryBasedOnTraining(stPark, stTrain = stTrain, dLevelSID = "sample_name",classTrain = "newAnn", classQuery = "description1",ct_scores = crParkall,nRand = 100)
+park_assessment <- assessmentReport_comm(comm$ct_score_com, classLevels = "description1",comm$stVal_com, dLevelSID = "sample_name")
+plot_multiAssess(park_assessment, method = "tsp_rf") 
 ```
-![ ](img/assess_tsp_rf_v2.png)
 
-```{r}
-source("~/Desktop/gpa_assess/scmap_assessment.R")
-scmap_intermediate <- prep_SimilarityMatrix(sce_test, expTest = expQuery_kid)
-tm_park_scmap_pearson<- assessmentReport_comm(t(scmap_intermediate$res_pearson), classLevels = "description3",stQuery_kid, dLevelSID = "sample_name")
-plot_multiAssess(tm_park_scmap_pearson, method = "scmap", ylimForMultiLogLoss = 200)
-```
-![ ](img/tm_park_pearson.png)
+<img src="md_img/Park_assess.png">
