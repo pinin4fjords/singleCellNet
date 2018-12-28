@@ -20,10 +20,12 @@ Requires:
     DescTools,
     patchwork,
     viridis,
-    Matrix,
-    reshape2
+    Matrix
 License: PRIVATE
 Encoding: UTF-8
 LazyData: true
 URL: http://pcahan1.github.io/singleCellNet
 RoxygenNote: 6.0.1.9000
+Imports: 
+    reshape2,
+    cowplot
