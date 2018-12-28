@@ -1,6 +1,56 @@
 # Patrick Cahan (C) 2017
 # patrick.cahan@gmail.com
 
+#' @export
+sc_violinClass<-function
+(sampTab,
+ classRes,
+ cellIDCol = "cell_name",
+ dLevel="cluster",
+ addRand=0,
+ threshold=0.20){
+  
+  sids <-rownames(sampTab)
+  colnames(sampTab)[which(colnames(sampTab) == dLevel)] = "cluster"
+  dLevel = "cluster"
+  classRes<-classRes[,sids]
+  stQ2<-cbind(sampTab[sids,], t(classRes[,sids]))
+  
+  maxX <-apply(classRes, 1, max)
+  meaVar <-names(which(maxX>threshold))
+  
+  test <- melt(stQ2, id.vars = c(cellIDCol, dLevel), measure.vars =  meaVar)
+  
+  cnames <- colnames(test)
+  cnames[which(cnames=='value')] <- "classification_score"
+  cnames[which(cnames=='variable')] <- "cell_type"
+  colnames(test) <- cnames
+  test
+  
+  
+  ggplot(test, aes(x = cluster, y = classification_score, fill = cluster)) + ylim(0,1) + geom_violin(scale='width', position='dodge', trim=FALSE) + 
+    facet_wrap(~ cell_type, ncol=1) + scale_y_continuous(
+      # expand = c(0, 0),
+      name = "Class score",
+      breaks = c(0,  0.50,  1.0),
+      labels = c("0", "0.50", "1.0"),
+      limits = c(0,1)
+    ) +
+    coord_cartesian(clip = "off") +
+    theme_dviz_hgrid() +
+    theme(
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(), 
+      axis.title.y = element_text(size = 8),
+      axis.title.x = element_text(size = 8),
+      axis.text.x = element_text(size = 8),
+      axis.text.y = element_text(size = 8),
+      legend.title=element_text(size=10), 
+      legend.text=element_text(size=10),
+      strip.text.x = element_text(size = 8)
+    ) + geom_boxplot(width=0.1, outlier.size=.25) + scale_fill_brewer(palette="Set2") 
+  
+}
 
 
 
