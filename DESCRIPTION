@@ -27,4 +27,5 @@ Imports:
     viridis,
     parallel,
     randomForest,
-    dplyr
+    dplyr,
+    reshape2
