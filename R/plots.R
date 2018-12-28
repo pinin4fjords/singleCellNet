@@ -1,11 +1,18 @@
 # Patrick Cahan (C) 2017
 # patrick.cahan@gmail.com
 
+#' @param sampTab
+#' @param classRes
+#' @param cellIDCol
+#' @param dLevel
+#' @param addRand
+#' @param threshold
+#'
 #' @import ggplot2
 #' @import reshape2
 #' @import cowplot
 #' @import RColorBrewer
-
+#'
 #' @export
 sc_violinClass<-function
 (sampTab,
