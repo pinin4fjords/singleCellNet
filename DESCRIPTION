@@ -20,7 +20,8 @@ Requires:
     DescTools,
     patchwork,
     viridis,
-    Matrix
+    Matrix,
+    reshape2
 License: PRIVATE
 Encoding: UTF-8
 LazyData: true
