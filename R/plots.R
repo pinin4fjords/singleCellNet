@@ -1,6 +1,8 @@
 # Patrick Cahan (C) 2017
 # patrick.cahan@gmail.com
 
+#' @title violin plot
+#' @description classification plot
 #' @param sampTab
 #' @param classRes
 #' @param cellIDCol
